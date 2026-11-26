@@ -12,7 +12,7 @@ Práctica de Aprendizaje Automático del Máster en Ciencia de Datos e IA de CUN
 | Ricardo Mataix Serrano | ricardo.mataix@cunef.edu |
 | Luis Prados Puertas | luis.prados@cunef.edu |
 | Juan Pablo Dávila Martínez | juanpablo.davila@cunef.edu |
-
+---
 
 ## 1. El problema
 
@@ -38,7 +38,7 @@ Al principio trabajamos con `Entities.csv`, una versión del mismo conjunto que 
 
 ### Ventajas
 
-- **Mucho volumen:** más de 127.000 anuncios de venta.
+- **Mucho volumen:** casi 112.000 anuncios de venta distintos, y unos 65.000 tras la limpieza.
 - **Cinco ciudades** con mercados muy distintos, desde Lahore y Karachi hasta Faisalabad.
 - **Ubicación en tres niveles:** zona, subzona y coordenadas. Con ellas calculamos la distancia al centro de cada ciudad.
 - **Datos reales de un portal en uso,** no simulados.
@@ -46,7 +46,7 @@ Al principio trabajamos con `Entities.csv`, una versión del mismo conjunto que 
 ### Desventajas
 
 - **Son precios de anuncio, no de venta.** El precio final puede ser otro.
-- **Muchos datos ausentes escondidos como ceros.** El 23,6 % de los anuncios de venta tiene 0 baños y el 11,2 %, 0 habitaciones. No es al azar: en Faisalabad faltan los baños en el 65 % de los anuncios, y en Lahore en el 18 %.
+- **Muchos datos ausentes escondidos como ceros.** El 23,6 % de los anuncios de venta tiene 0 baños y el 11,2 %, 0 habitaciones. No es al azar: en Faisalabad faltan los baños en el 65 % de los anuncios, y en Lahore en el 18 %. Como decidimos eliminar esos anuncios, Faisalabad queda con muy pocos datos (menos del 3 %).
 - **Anuncios repetidos.** Los agentes publican la misma vivienda varias veces, a veces con pequeños cambios en la descripción. Hay que tenerlo en cuenta al separar train y test.
 - **Las coordenadas son de la subzona,** no de cada vivienda: hay unos 8.800 puntos distintos para todo el conjunto.
 - **`date_added` es la fecha de la última actualización,** no la de publicación. Casi todas caen en junio y julio de 2019, así que no sirve para estudiar la evolución del precio.
@@ -56,30 +56,30 @@ Al principio trabajamos con `Entities.csv`, una versión del mismo conjunto que 
 ## 3. Planteamiento como problema de Aprendizaje Automático
 
 - **Tipo de problema:** aprendizaje supervisado, **regresión**.
-- **Variable objetivo:** `price`, el precio de venta en euros. Lo modelamos en escala logarítmica porque está muy sesgado a la derecha (asimetría de 5,7, frente a 0,3 en logaritmos). Además, en logaritmos el error se interpreta en términos relativos, que es lo que importa en un precio.
+- **Variable objetivo:** `price`, el precio de venta en euros. Lo modelamos en escala logarítmica porque está muy sesgado a la derecha (asimetría de 8,7, frente a −0,3 en logaritmos). Además, en logaritmos el error se interpreta en términos relativos, que es lo que importa en un precio.
 - **Anuncios que usamos:** solo los de venta. El alquiler es otro problema, con precios mensuales en otra escala.
 - **Vector de atributos:**
 
 | Atributo | Tipo | Descripción |
 | --- | --- | --- |
-| `property_type` | Categórico | Casa, piso, planta superior o inferior, casa de campo, ático, habitación |
+| `property_type` | Categórico | `House` (casa) o `Flat` (piso; agrupa también plantas, áticos y habitaciones) |
 | `city` | Categórico | Una de las 5 ciudades |
-| `location` | Categórico | Zona (unos 1.460 valores distintos) |
-| `location_id` | Categórico | Subzona dentro de la zona (unos 4.000 valores) |
+| `location` | Categórico | Zona (unos 1.400 valores distintos) |
+| `location_id` | Categórico | Subzona dentro de la zona (unos 3.800 valores) |
 | `latitude`, `longitude` | Numérico | Coordenadas de la subzona |
 | `dist_centro_km` | Numérico | Distancia al centro de la ciudad (fórmula de Haversine) |
 | `Total_Area` | Numérico | Superficie en m² |
-| `bedrooms` | Numérico | Habitaciones (con valores ausentes) |
-| `baths` | Numérico | Baños (con valores ausentes) |
-| `date_added` | Fecha | Fecha de actualización del anuncio |
+| `bedrooms` | Numérico | Habitaciones (de 1 a 12) |
+| `baths` | Numérico | Baños (de 1 a 12) |
+| `date_added` | Fecha | Fecha de actualización del anuncio (no la usamos en el modelo) |
 
 ## 4. Enfoque
 
 1. **Descripción de los datos:** tipos, ausentes, duplicados, valores imposibles.
-2. **Limpieza con reglas fijas:** solo ventas, conversión de unidades (la superficie a m² desde el texto original y el precio a euros), los ceros de baños y habitaciones como ausentes, límites de superficie por tipo de vivienda, coordenadas fuera de su ciudad y anuncios repetidos. Como son reglas que miran cada fila por separado, se pueden aplicar antes de separar train y test sin que haya fuga de información.
-3. **Partición train/test (80/20)**, agrupando los anuncios que pueden ser la misma vivienda (misma ciudad, zona, tipo, superficie y precio) y estratificando por ciudad. Con una partición aleatoria normal, más de la mitad del test tendría un "gemelo" en el train y la evaluación saldría inflada.
+2. **Limpieza con reglas fijas:** solo ventas, conversión de unidades (la superficie a m² desde el texto original y el precio a euros), eliminación de los anuncios con 0 baños o 0 habitaciones (son datos sin rellenar), límites de superficie por tipo de vivienda (pisos hasta 600 m² y casas por debajo de 5.000 m²), coordenadas fuera de su ciudad y anuncios repetidos. Como son reglas que miran cada fila por separado, se pueden aplicar antes de separar train y test sin que haya fuga de información. Pasamos de 191.393 anuncios a 64.722 viviendas en venta.
+3. **Partición train/test (80/20)**, agrupando los anuncios que pueden ser la misma vivienda (misma ciudad, zona, tipo, superficie y precio) y estratificando por ciudad. Con una partición aleatoria normal, casi la mitad del test (un 48 %) tendría un "gemelo" en el train y la evaluación saldría inflada.
 4. **Análisis exploratorio sobre el train:** distribuciones, relaciones con el precio, diferencias entre ciudades y tipos, y atípicos, con las conclusiones y acciones que se derivan de cada análisis.
-5. **Preparación para el modelado,** ajustada solo con el train: imputación de baños y habitaciones, codificación de la zona y la subzona con el precio medio de cada una, *one-hot* de ciudad y tipo, nuevas variables y escalado, todo dentro de un `Pipeline` de scikit-learn.
+5. **Preparación para el modelado,** ajustada solo con el train: codificación de la zona y la subzona con el precio medio de cada una, *one-hot* de ciudad y tipo, nuevas variables (superficie y baños por habitación, logaritmo de la superficie) y escalado, todo dentro de un `Pipeline` de scikit-learn.
 6. **Modelado:** empezaremos por un modelo de referencia (regresión lineal) y lo compararemos con modelos regularizados y de árboles (*random forest* y *gradient boosting*), ajustando hiperparámetros con validación cruzada agrupada. Mediremos el error con RMSE y MAE sobre el logaritmo del precio, y además con el error porcentual, que es fácil de interpretar en un precio.
 
 ## 5. Estructura del repositorio
@@ -88,12 +88,14 @@ Al principio trabajamos con `Entities.csv`, una versión del mismo conjunto que 
 Practica-Machine-Learning/
 ├── data/                         # no se sube al repositorio
 │   ├── bronze/Property.csv       # datos originales
-│   └── silver/                   # datos limpios y particiones
+│   └── silver/                   # salida.csv (datos limpios), train.csv y test.csv
 ├── notebooks/
 │   ├── 00_descripcion_datos.ipynb
 │   ├── 01_limpieza.ipynb
 │   ├── 02_particion_train_test.ipynb
 │   └── 03_EDA.ipynb
+├── src/
+│   └── graficos.py               # funciones de gráficos para el EDA
 ├── html/                         # notebooks exportados a HTML
 ├── requirements.txt
 └── README.md
